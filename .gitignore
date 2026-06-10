@@ -5,3 +5,8 @@ Thumbs.db
 # Editor
 .vscode/
 *.swp
+
+# PDF is hosted as GitHub Release asset
+*.pdf
+
+.vercel

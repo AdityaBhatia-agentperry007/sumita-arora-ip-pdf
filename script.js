@@ -1,132 +1,180 @@
-// =============================================
-//   SUMITA ARORA PDF PAGE — INTERACTIONS
-// =============================================
+// ============================================
+//   SUMITA ARORA — SHARP MINIMAL INTERACTIONS
+// ============================================
 
-// ----- Floating emoji particles -----
-const EMOJIS = ['📚', '😭', '💀', '🔥', '✍️', '🧠', '💯', '🫡', '😤', '📖', '⚡', '🎯'];
+// ----- Custom cursor -----
+const cursor = document.getElementById('cursor');
+let mx = 0, my = 0;
+let cx = 0, cy = 0;
 
-function spawnParticle() {
-  const container = document.getElementById('particles');
-  if (!container) return;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX;
+  my = e.clientY;
+});
 
-  const p = document.createElement('div');
-  p.className = 'particle';
-  p.textContent = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-  p.style.left = `${Math.random() * 100}vw`;
-  p.style.fontSize = `${0.8 + Math.random() * 1.5}rem`;
-  p.style.animationDuration = `${6 + Math.random() * 10}s`;
-  p.style.animationDelay = `${Math.random() * 3}s`;
-  p.style.opacity = (0.3 + Math.random() * 0.5).toString();
-  container.appendChild(p);
-
-  // Remove after animation
-  setTimeout(() => p.remove(), 18000);
-}
-
-// Spawn particles periodically
-for (let i = 0; i < 12; i++) {
-  setTimeout(spawnParticle, i * 400);
-}
-setInterval(spawnParticle, 1500);
-
-
-// ----- Confetti on download -----
-const CONFETTI_COLORS = [
-  '#7c3aed', '#ec4899', '#f97316', '#fbbf24',
-  '#06b6d4', '#10b981', '#a78bfa', '#f472b6'
-];
-
-function launchConfetti() {
-  const container = document.getElementById('confettiContainer');
-  if (!container) return;
-
-  for (let i = 0; i < 80; i++) {
-    setTimeout(() => {
-      const piece = document.createElement('div');
-      piece.className = 'confetti-piece';
-      piece.style.left = `${Math.random() * 100}vw`;
-      piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
-      piece.style.width = `${6 + Math.random() * 10}px`;
-      piece.style.height = `${6 + Math.random() * 10}px`;
-      piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
-      piece.style.animationDuration = `${2 + Math.random() * 3}s`;
-      container.appendChild(piece);
-      setTimeout(() => piece.remove(), 5000);
-    }, i * 25);
+function animateCursor() {
+  cx += (mx - cx) * 0.12;
+  cy += (my - cy) * 0.12;
+  if (cursor) {
+    cursor.style.left = cx + 'px';
+    cursor.style.top  = cy + 'px';
   }
+  requestAnimationFrame(animateCursor);
 }
+animateCursor();
 
-// Attach to all download buttons
-document.querySelectorAll('.download-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    launchConfetti();
-    // Change button text briefly
-    const mainText = btn.querySelector('.btn-main');
-    if (mainText) {
-      const original = mainText.textContent;
-      mainText.textContent = 'DOWNLOADING... 🎉';
-      setTimeout(() => { mainText.textContent = original; }, 3000);
-    }
-  });
+// Expand cursor on interactive elements
+document.querySelectorAll('a, button, .chapter-card').forEach(el => {
+  el.addEventListener('mouseenter', () => cursor?.classList.add('expanded'));
+  el.addEventListener('mouseleave', () => cursor?.classList.remove('expanded'));
 });
 
 
-// ----- Scroll reveal animation -----
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
+// ----- Particle grid canvas background -----
+const canvas = document.getElementById('bgCanvas');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Dot grid
+const COLS = 28;
+const ROWS = 18;
+
+class Dot {
+  constructor(x, y) {
+    this.ox = x;
+    this.oy = y;
+    this.x  = x;
+    this.y  = y;
+    this.r  = 1;
+    this.alpha = 0.15 + Math.random() * 0.2;
+    this.speed = 0.3 + Math.random() * 0.5;
+    this.offset = Math.random() * Math.PI * 2;
+    this.pulseAmt = 0;
+  }
+  update(t, mouseX, mouseY) {
+    // Gentle breathing
+    this.alpha = 0.1 + 0.12 * Math.sin(t * this.speed + this.offset);
+    // Mouse repulsion
+    const dx = mouseX - this.ox;
+    const dy = mouseY - this.oy;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const maxDist = 140;
+    if (dist < maxDist) {
+      const force = (maxDist - dist) / maxDist;
+      this.x = this.ox - dx / dist * force * 30;
+      this.y = this.oy - dy / dist * force * 30;
+      this.alpha = 0.5 + 0.5 * force;
+      this.r = 1 + force * 2.5;
+    } else {
+      this.x += (this.ox - this.x) * 0.08;
+      this.y += (this.oy - this.y) * 0.08;
+      this.r += (1 - this.r) * 0.1;
+    }
+  }
+  draw(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200, 255, 0, ${this.alpha})`;
+    ctx.fill();
+  }
+}
+
+let dots = [];
+
+function buildDots() {
+  dots = [];
+  const W = canvas.width;
+  const H = canvas.height;
+  const gapX = W / (COLS - 1);
+  const gapY = H / (ROWS - 1);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      dots.push(new Dot(c * gapX, r * gapY));
+    }
+  }
+}
+
+buildDots();
+window.addEventListener('resize', buildDots);
+
+let mouseX = -999, mouseY = -999;
+document.addEventListener('mousemove', e => {
+  mouseX = e.clientX;
+  mouseY = e.clientY;
+});
+
+let t = 0;
+function drawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  t += 0.015;
+  dots.forEach(d => {
+    d.update(t, mouseX, mouseY);
+    d.draw(ctx);
+  });
+  requestAnimationFrame(drawCanvas);
+}
+drawCanvas();
+
+
+// ----- Scroll-triggered reveal for chapters -----
+const cards = document.querySelectorAll('.chapter-card');
+const revealObs = new IntersectionObserver((entries) => {
+  entries.forEach((entry, i) => {
     if (entry.isIntersecting) {
       entry.target.style.opacity = '1';
-      entry.target.style.transform = 'translateY(0)';
+      entry.target.style.transform = 'translateX(0)';
+      revealObs.unobserve(entry.target);
     }
   });
 }, { threshold: 0.1 });
 
-document.querySelectorAll('.fact-card, .cta-box, .stats-row, .meme-card').forEach(el => {
-  el.style.opacity = '0';
-  el.style.transform = 'translateY(30px)';
-  el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-  observer.observe(el);
+cards.forEach((card, i) => {
+  card.style.opacity = '0';
+  card.style.transform = 'translateX(-20px)';
+  card.style.transition = `opacity 0.5s ${i * 0.07}s ease, transform 0.5s ${i * 0.07}s ease`;
+  revealObs.observe(card);
 });
 
-
-// ----- Easter egg: Konami code -----
-const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
-let konamiIdx = 0;
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === KONAMI[konamiIdx]) {
-    konamiIdx++;
-    if (konamiIdx === KONAMI.length) {
-      konamiIdx = 0;
-      // MEGA confetti
-      for (let i = 0; i < 5; i++) setTimeout(launchConfetti, i * 300);
-      alert('🔥 KONAMI CODE ACTIVATED! You\'re ready for boards! 💀');
-    }
-  } else {
-    konamiIdx = 0;
-  }
-});
-
-
-// ----- Random title wobble on hover -----
-const titleMain = document.querySelector('.title-main');
-if (titleMain) {
-  titleMain.addEventListener('mouseenter', () => {
-    titleMain.style.transform = `rotate(${(Math.random() - 0.5) * 4}deg) scale(1.02)`;
-    titleMain.style.transition = 'transform 0.2s ease';
-  });
-  titleMain.addEventListener('mouseleave', () => {
-    titleMain.style.transform = 'rotate(0deg) scale(1)';
-  });
+// Reveal CTA too
+const cta = document.querySelector('.cta-inner');
+if (cta) {
+  cta.style.opacity = '0';
+  cta.style.transform = 'translateY(20px)';
+  cta.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+  new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        cta.style.opacity = '1';
+        cta.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.2 }).observe(cta);
 }
 
-// ----- Console message for devs -----
-console.log(`
-%c📚 SUMITA ARORA IP XII PDF 📚
-%cyou opened devtools?? go study lmao 💀
-%cgoodluck on boards tho fr 🫶
-`, 
-'color: #7c3aed; font-size: 1.2rem; font-weight: bold;',
-'color: #ec4899; font-size: 1rem;',
-'color: #06b6d4; font-size: 0.9rem;'
-);
+
+// ----- Download flash effect -----
+document.querySelectorAll('.download-btn, .cta-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // quick flash on the page
+    document.body.style.transition = 'background 0.1s ease';
+    document.body.style.background = '#0d1a00';
+    setTimeout(() => { document.body.style.background = '#080808'; }, 200);
+  });
+});
+
+
+// ----- Header border on scroll -----
+const header = document.querySelector('.header');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 20) {
+    header.style.borderBottomColor = 'rgba(255,255,255,0.12)';
+  } else {
+    header.style.borderBottomColor = 'rgba(255,255,255,0.07)';
+  }
+});
