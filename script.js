@@ -158,13 +158,89 @@ if (cta) {
 }
 
 
-// ----- Download flash effect -----
+// ----- Firecracker spark burst on download click -----
+const SPARK_COLORS = ['#c8ff00', '#ffffff', '#a3e635', '#d9ff66', '#f0ffa0'];
+
+class Spark {
+  constructor(x, y) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.5 + Math.random() * 5;
+    this.x  = x;
+    this.y  = y;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - (1 + Math.random() * 2); // slight upward bias
+    this.life = 1;
+    this.decay = 0.022 + Math.random() * 0.022;
+    this.len = 4 + Math.random() * 10;
+    this.color = SPARK_COLORS[Math.floor(Math.random() * SPARK_COLORS.length)];
+    this.gravity = 0.12;
+  }
+  update() {
+    this.x  += this.vx;
+    this.y  += this.vy;
+    this.vy += this.gravity;
+    this.vx *= 0.97;
+    this.life -= this.decay;
+  }
+  draw(ctx) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, this.life);
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = this.color;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x - this.vx * this.len * 0.4, this.y - this.vy * this.len * 0.4);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Dedicated overlay canvas for sparks (on top of everything)
+const sparkCanvas = document.createElement('canvas');
+sparkCanvas.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:8000;';
+document.body.appendChild(sparkCanvas);
+const sCtx = sparkCanvas.getContext('2d');
+
+function resizeSpark() {
+  sparkCanvas.width  = window.innerWidth;
+  sparkCanvas.height = window.innerHeight;
+}
+resizeSpark();
+window.addEventListener('resize', resizeSpark);
+
+let sparks = [];
+let sparkRaf = null;
+
+function runSparks() {
+  sCtx.clearRect(0, 0, sparkCanvas.width, sparkCanvas.height);
+  sparks = sparks.filter(s => s.life > 0);
+  sparks.forEach(s => { s.update(); s.draw(sCtx); });
+  if (sparks.length > 0) {
+    sparkRaf = requestAnimationFrame(runSparks);
+  } else {
+    sparkRaf = null;
+    sCtx.clearRect(0, 0, sparkCanvas.width, sparkCanvas.height);
+  }
+}
+
+function burst(x, y, count = 38) {
+  for (let i = 0; i < count; i++) sparks.push(new Spark(x, y));
+  if (!sparkRaf) runSparks();
+}
+
 document.querySelectorAll('.download-btn, .cta-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    // quick flash on the page
-    document.body.style.transition = 'background 0.1s ease';
+  btn.addEventListener('click', e => {
+    // Burst from click point
+    burst(e.clientX, e.clientY, 42);
+    // Also burst from center of button after tiny delay for double-pop feel
+    const r = btn.getBoundingClientRect();
+    setTimeout(() => burst(r.left + r.width / 2, r.top + r.height / 2, 28), 80);
+    // Subtle background flash
+    document.body.style.transition = 'background 0.08s ease';
     document.body.style.background = '#0d1a00';
-    setTimeout(() => { document.body.style.background = '#080808'; }, 200);
+    setTimeout(() => { document.body.style.background = '#080808'; }, 160);
   });
 });
 

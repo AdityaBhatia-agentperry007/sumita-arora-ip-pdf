@@ -1,0 +1,2 @@
+# The PDF is served from GitHub Releases, not Vercel
+*.pdf
